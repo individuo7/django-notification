@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from django.utils.translation import ugettext
 
 from notification import backends
+from django.db.models import get_model
 
 
 class EmailBackend(backends.BaseBackend):
@@ -17,6 +18,7 @@ class EmailBackend(backends.BaseBackend):
 
     def deliver(self, recipient, sender, notice_type, extra_context):
         # TODO: require this to be passed in extra_context
+        Email = get_model('notification', 'Email')
 
         context = self.default_context()
         context.update({
@@ -38,5 +40,14 @@ class EmailBackend(backends.BaseBackend):
         body = render_to_string("notification/email_body.txt", {
             "message": messages["full.txt"],
         }, context)
+
+        ignore_list = getattr(settings, "NOTIFICATION_LOG_IGNORE", [])
+        if notice_type.label not in ignore_list:
+            Email.objects.create(
+                to=recipient.email,
+                subject=subject,
+                body=body,
+                notice_type=notice_type
+            )
 
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [recipient.email])
